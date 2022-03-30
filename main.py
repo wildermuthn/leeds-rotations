@@ -1,4 +1,6 @@
 from ortools.linear_solver import pywraplp
+from ortools.sat.python import cp_model
+
 
 ordered_roster_names = [
     'Aras',
@@ -80,52 +82,82 @@ def main():
 
     # Solver
     # Create the mip solver with the SCIP backend.
-    solver = pywraplp.Solver.CreateSolver('GLOP')
+    model = cp_model.CpModel()
 
     # Variables
-    # x[i, j] is an array of 0-1 variables, which will be 1
-    # if worker i is assigned to task j.
-    x = {}
-    for k in range(num_intervals):
-        for i in range(num_players):
-            for j in range(num_positions):
-                x[i, j, k] = solver.IntVar(0, 1, '')
+    x = []
+    for i in range(num_players):
+        t = []
+        for j in range(num_positions):
+            t.append(model.NewBoolVar(f'x[{i},{j}]'))
+        x.append(t)
 
     # Constraints
-    # Each worker is assigned to at most 1 task.
-    for k in range(num_intervals):
-        for i in range(num_players):
-            solver.Add(solver.Sum([x[i, j, k] for j in range(num_positions)]) <= 1)
-
-    # Each task is assigned to exactly one worker.
-    for k in range(num_intervals):
-        for j in range(num_positions):
-            solver.Add(solver.Sum([x[i, j, k] for i in range(num_players)]) == 1)
-
-    # Player gets at least 1 interval
-    t = {}
+    # Each worker is assigned to at most one task.
     for i in range(num_players):
         for j in range(num_positions):
-            t[i] = solver.Sum([x[i, j, k] for k in range(num_intervals)])
-            solver.Add( t[i] >= 0)
+            model.AddAllowedAssignments(t, [0, 1] )
+
+    # Each task is assigned to exactly one worker.
+    for j in range(num_positions):
+        model.AddExactlyOne(x[i][j] for i in range(num_players))
 
     # Objective
     objective_terms = []
-    for k in range(num_intervals):
-        for i in range(num_players):
-            for j in range(num_positions):
-                objective_terms.append(position_skills[i][j] * x[i, j, k])
+    for i in range(num_players):
+        for j in range(num_positions):
+            objective_terms.append(position_skills[i][j] * x[i][j])
+    model.Maximize(sum(objective_terms))
 
-    for k in t:
-        objective_terms.append(t[k])
+    # Solve
+    solver = cp_model.CpSolver()
+    status = solver.Solve(model)
 
-    solver.Maximize(solver.Sum(objective_terms))
+    # 
+    # # Variables
+    # # x[i, j] is an array of 0-1 variables, which will be 1
+    # # if worker i is assigned to task j.
+    # x = {}
+    # for k in range(num_intervals):
+    #     for i in range(num_players):
+    #         for j in range(num_positions):
+    #             x[i, j, k] = solver.IntVar(0, 1, '')
+    # 
+    # # Constraints
+    # # Each worker is assigned to at most 1 task.
+    # for k in range(num_intervals):
+    #     for i in range(num_players):
+    #         solver.Add(solver.Sum([x[i, j, k] for j in range(num_positions)]) <= 1)
+    # 
+    # # Each task is assigned to exactly one worker.
+    # for k in range(num_intervals):
+    #     for j in range(num_positions):
+    #         solver.Add(solver.Sum([x[i, j, k] for i in range(num_players)]) == 1)
+    # 
+    # # Player gets at least 1 interval
+    # t = {}
+    # for i in range(num_players):
+    #     for j in range(num_positions):
+    #         t[i] = solver.Sum([x[i, j, k] for k in range(num_intervals)])
+    #         solver.Add( t[i] >= 0)
+    # 
+    # # Objective
+    # objective_terms = []
+    # for k in range(num_intervals):
+    #     for i in range(num_players):
+    #         for j in range(num_positions):
+    #             objective_terms.append(position_skills[i][j] * x[i, j, k])
+    # 
+    # for k in t:
+    #     objective_terms.append(t[k])
+    # 
+    # solver.Maximize(solver.Sum(objective_terms))
     # solver.Maximize(t)
 
     # Solve
-    status = solver.Solve()
+    # status = solver.Solve()
 
-    if status == pywraplp.Solver.OPTIMAL or status == pywraplp.Solver.FEASIBLE:
+    if status == cp_model.OPTIMAL or status == cp_model.FEASIBLE:
         print(f'Success')
     else:
         print('No solution found.')
@@ -134,34 +166,31 @@ def main():
 
     # Print solution.
 
-    for k in range(num_intervals):
-        print(f'Total Value = {solver.Objective().Value()}\n')
-        players_by_position = {}
-        players_benched = []
-        players_playing = []
-        print(f'Interval: {k}')
-        if status == pywraplp.Solver.OPTIMAL or status == pywraplp.Solver.FEASIBLE:
-            for i in range(num_players):
-                for j in range(num_positions):
-                    # print(i,j, x[i, j, k].solution_value())
-                    if x[i, j, k].solution_value() > 0:
-                        players_playing.append(players[i])
-                        players_by_position[formation_position_index[j]] = players[i]
+    print(f'Total Value = {solver.ObjectiveValue()}\n')
+    players_by_position = {}
+    players_benched = []
+    players_playing = []
+    for i in range(num_players):
+        for j in range(num_positions):
+            # print(i,j, x[i, j, k].solution_value())
+            if solver.BooleanValue(x[i][j]):
+                players_playing.append(players[i])
+                players_by_position[formation_position_index[j]] = players[i]
 
-        for name in players:
-            if name not in players_playing:
-                players_benched.append(name)
+    for name in players:
+        if name not in players_playing:
+            players_benched.append(name)
 
-        for benched in players_benched:
-            print(f'{benched} is on bench')
+    for benched in players_benched:
+        print(f'{benched} is on bench')
 
-        print("")
+    print("")
 
-        for i in formations_positions:
-            print(f'{i}: {players_by_position[i]}')
+    for i in formations_positions:
+        print(f'{i}: {players_by_position[i]}')
 
-        print("")
-        print("")
+    print("")
+    print("")
 
 
 if __name__ == '__main__':
