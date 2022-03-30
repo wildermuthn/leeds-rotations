@@ -95,8 +95,7 @@ def main():
     # Constraints
     # Each worker is assigned to at most one task.
     for i in range(num_players):
-        for j in range(num_positions):
-            model.AddAllowedAssignments(t, [0, 1] )
+        model.AddAtMostOne(x[i][j] for j in range(num_positions))
 
     # Each task is assigned to exactly one worker.
     for j in range(num_positions):
