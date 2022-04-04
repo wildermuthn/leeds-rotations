@@ -2,6 +2,8 @@ from ortools.linear_solver import pywraplp
 from ortools.sat.python import cp_model
 from tabulate import tabulate
 import pprint
+from functools import reduce
+
 pp = pprint.PrettyPrinter(indent=4)
 
 
@@ -27,58 +29,95 @@ ordered_roster_names = [
     'Sam',
 ]
 
-ordered_player_numbers = [
+position_values_index = [
     2, 3, 4, 5, 6, 7, 11, 8, 10, 9
 ]
 
-def main(num_intervals, formation_positions, playing_time_level = 'equal'):
+
+def main(
+        num_intervals,
+        formation_positions_with_name,
+        playing_time_level = 'equal',
+        force_starting_bench=[],
+        missing_players=[]
+):
     # Data
+    formation_positions = formation_positions_with_name[:-1]
     model = cp_model.CpModel()
 
-    roster_position_values = [
+    position_weights = {
+        2: 1,
+        3: 1,
+        4: 1,
+        5: 1,
+        6: 1,
+        7: 1,
+        11: 1,
+        8: 1,
+        10: 1,
+        9: 1,
+    }
+
+    player_number_values = [
       # [2, 3, 4, 5, 6, 7, 11,8,10, 9],      # 'Positions',
-        [3, 3, 3, 3, 3, 3, 4, 3, 4, 5],  # 'Aras',
-        [3, 3, 2, 2, 2, 2, 3, 2, 2, 3],  # 'Bilind',
-        [4, 4, 4, 4, 4, 5, 5, 4, 4, 4],  # 'Brady',
-        [3, 3, 3, 3, 3, 3, 2, 2, 2, 3],  # 'Emir',
-        [4, 4, 5, 5, 4, 4, 4, 5, 4, 5],  # 'Henry',
-        [4, 4, 4, 4, 4, 3, 3, 3, 2, 2],  # 'James',
-        [5, 4, 4, 4, 4, 5, 4, 4, 4, 4],  # 'Leo',
+      #   [0, 0, 0, 0, 0, 0, 1, 0, 0, 1],  # 'Aras',
+      #   [0, 0, 0, 0, 0, 1, 0, 0, 0, 1],  # 'Bilind',
+      #   [0, 0, 1, 0, 0, 0, 1, 0, 1, 0],  # 'Brady',
+      #   [0, 1, 0, 0, 0, 0, 1, 0, 0, 1],  # 'Emir',
+      #   [0, 0, 1, 0, 0, 0, 0, 1, 1, 0],  # 'Henry',
+      #   [1, 1, 1, 0, 1, 0, 0, 0, 0, 0],  # 'James',
+      #   [0, 0, 0, 0, 0, 1, 0, 0, 0, 1],  # 'Leo',
+      #   [1, 1, 0, 0, 0, 1, 1, 0, 0, 1],  # 'Liam',
+      #   [1, 1, 0, 0, 0, 1, 0, 0, 1, 0],  # 'Oliver',
+      #   [1, 1, 0, 0, 0, 1, 1, 0, 0, 0],  # 'Owen',
+      #   [0, 0, 0, 0, 1, 0, 0, 1, 1, 1],  # 'Sam',
+
+    # # [2, 3, 4, 5, 6, 7, 11,8,10, 9],      # 'Positions',
+        [2, 2, 2, 2, 2, 4, 4, 3, 5, 5],  # 'Aras',
+        [4, 4, 3, 3, 2, 4, 3, 2, 2, 3],  # 'Bilind',
+        [3, 4, 3, 3, 3, 4, 5, 4, 3, 3],  # 'Brady',
+        [3, 4, 3, 3, 3, 3, 3, 2, 2, 2],  # 'Emir',
+        [3, 4, 3, 3, 4, 3, 4, 5, 5, 4],  # 'Henry',
+        [4, 4, 5, 4, 0, 0, 0, 0, 0, 0],  # 'James',
+        [4, 4, 3, 3, 4, 4, 4, 3, 4, 3],  # 'Leo',
         [2, 2, 1, 1, 1, 2, 2, 1, 1, 2],  # 'Liam',
-        [3, 3, 2, 2, 3, 4, 4, 3, 3, 3],  # 'Oliver',
-        [2, 2, 2, 2, 1, 1, 1, 1, 2, 2],  # 'Owen',
-        [4, 4, 4, 4, 3, 5, 5, 4, 5, 5],  # 'Sam',
+        [2, 2, 2, 2, 2, 3, 3, 2, 3, 3],  # 'Oliver',
+        [2, 2, 2, 2, 0, 0, 0, 0, 1, 1],  # 'Owen',
+        [3, 3, 3, 3, 4, 4, 3, 4, 5, 5],  # 'Sam',
+
+
+        #
+        # [3, 3, 3, 3, 3.25, 3.75, 3.75, 3.25, 3.75, 3.75],
+        # [3.333333333, 3.333333333, 3.5, 3.5, 3.25, 3.25, 3.25, 3.25, 3.25, 3.25],
+        # [3.333333333, 3.333333333, 3.5, 3.5, 3.25, 3.25, 3.25, 3.5, 3.5, 3.75],
+        # [3, 3, 3.25, 3.25, 3, 2.75, 2.75, 3.25, 3.25, 3.25],
+        # [3.5, 3.5, 4, 4, 3.5, 3.75, 3.75, 4.25, 4, 4],
+        # [3.5, 3.5, 4, 4, 3.75, 3.25, 3.25, 4, 3.5, 3.25],
+        # [3.666666667, 3.666666667, 3.75, 3.75, 3.75, 3.75, 3.75, 4, 3.75, 3],
+        # [2.833333333, 2.833333333, 2.75, 2.75, 2.75, 2.75, 2.75, 2.5, 2.75, 2.75],
+        # [3.333333333, 3.333333333, 3.25, 3.25, 3.25, 3.5, 3.5, 3, 3.5, 3.5],
+        # [2.5, 2.5, 2.25, 2.25, 2.5, 2.5, 2.5, 2.5, 2.75, 3],
+        # [3.333333333, 3.333333333, 3.5, 3.5, 3.75, 3.5, 3.5, 3.5, 3.75, 3.5],
 
     ]
-    force_to_bench = []
-
-    position_skills = []
+    # position_skills = []
     players = []
-    formation_position_index = []
-    # For each player's positional values
-    for i in range(len(roster_position_values)):
-        # As long as the player is not on the bench
-        if ordered_roster_names[i] not in force_to_bench:
-            current_player_position_values = roster_position_values[i]
-            filtered_position_values = []
+    num_players = len(ordered_roster_names) - len(missing_players)
+    num_positions = len(formation_positions)
+
+    def i_j_to_player_value(i, j):
+        player_name = players[i]
+        player_name_values_idx = ordered_roster_names.index(player_name)
+        player_values = player_number_values[player_name_values_idx]
+        player_values_idx = position_values_index.index(formation_positions[j])
+        return player_values[player_values_idx]
+
+    for i in range(len(ordered_roster_names)):
+        if ordered_roster_names[i] not in missing_players:
             players.append(ordered_roster_names[i])
-            for position_index in range(len(current_player_position_values)):
-                if ordered_player_numbers[position_index] in formation_positions:
-                    filtered_position_values.append(current_player_position_values[position_index])
-                    if len(formation_position_index) < len(formation_positions):
-                        formation_position_index.append(ordered_player_numbers[position_index])
-            position_skills.append(filtered_position_values)
-
-    num_players = len(position_skills)
-    num_positions = len(position_skills[0])
-
-    # num_intervals = 24
-
-    # Solver
-    # Create the mip solver with the SCIP backend.
 
     # Variables
-    x = {}  # x[(player_id)(position_id)(interval)]  # position_id can be re-used instead of going with a tensor, by going from 0-7, then 8-15.
+    x = {}
     for k in range(num_intervals):
 
         # vars for every combo of player-position-interval
@@ -88,21 +127,43 @@ def main(num_intervals, formation_positions, playing_time_level = 'equal'):
 
         # Each on field position is assigned to exactly one player
         for j in range(num_positions):
-            all_players_for_one_position = [x[(i, j, k)] for i in range(num_players)]
-            model.AddExactlyOne(all_players_for_one_position)
+            model.AddExactlyOne(x[(i, j, k)] for i in range(num_players))
 
         # Each player is assigned to 0 to 1 positions in total
         for i in range(num_players):
             model.AddAtMostOne(x[(i, j, k)] for j in range(num_positions))
 
-    # # Keep players in the same position if they remain on the field
-    # for k in range(num_intervals):
-    #     for i in range(num_players):
-    #         for j in range(num_positions):
-    #             if (k > 0):
-    #                 last_position = x[(i, j, k-1)]
-    #                 next_position = x[(i, j, k)]
-    #                 model.AddBoolAnd(next_position, last_position).OnlyEnforceIf(next_position)
+    # force initial bench
+    for i in range(num_players):
+        for j in range(num_positions):
+            if players[i] in force_starting_bench:
+                model.Add(x[(i, j, 0)] == 0)
+                model.Add(x[(i, j, num_intervals-1)] == 0)
+
+    # Keep players in the same position if they remain on the field
+    same_position_bonus = {}
+    for k in range(num_intervals):
+        for i in range(num_players):
+            for j in range(num_positions):
+                if k > 0 and k != int(num_intervals/2):
+                    last_position = x[(i, j, k-1)]
+                    next_position = x[(i, j, k)]
+                    same_position_bonus[(i, j, k)] = model.NewBoolVar(f'p[({i},{j},{k})]')
+                    model.AddMinEquality(
+                        same_position_bonus[(i, j, k)],
+                        [next_position, last_position]
+                    )
+
+    # avoid bench twice in a row
+    for i in range(num_players):
+        for k in range(num_intervals):
+            if k > 0:
+                last_on_field = [x[(i, j, k-1)] for j in range(num_positions)]
+                next_on_field = [x[(i, j, k)] for j in range(num_positions)]
+                model.Add((sum(last_on_field) + sum(next_on_field)) > 0)
+
+
+    objective_terms = []
 
     # Set variables for playing time
     players_position_intervals = []
@@ -110,28 +171,49 @@ def main(num_intervals, formation_positions, playing_time_level = 'equal'):
         s = cp_model.LinearExpr.Sum([x[(i, j, k)] for j in range(num_positions) for k in range(num_intervals)])
         players_position_intervals.append(s)
 
-    if playing_time_level == 'equal':
-        equal_var = model.NewIntVar(0, 10000000, 'equalVar')
-        model.AddMaxEquality(equal_var, players_position_intervals)
-        model.AddMinEquality(equal_var, players_position_intervals)
+    if playing_time_level != 'unequal':
 
-    if playing_time_level == 'almost_equal':
-        model.AddMinEquality(int(num_intervals * .75), players_position_intervals)
+        if playing_time_level == 'equal':
+            equal_var = model.NewIntVar(0, num_intervals, 'equalVar')
+            model.AddMaxEquality(equal_var, players_position_intervals)
+            model.AddMinEquality(equal_var, players_position_intervals)
 
-    if playing_time_level == 'feasible_equality':
-        equal_var = model.NewIntVar(0, 10000000, 'equalVar')
-        model.AddMinEquality(equal_var, players_position_intervals)
+        if playing_time_level == 'almost_equal':
+            min_equal_var = int(num_intervals*.75)
+            max_equal_var = 6
+            model.AddMinEquality(int(num_intervals * .75), players_position_intervals)
+
+        if playing_time_level == 'feasible_equality':
+            min_equal_var = model.NewIntVar(0, num_intervals, 'equalVar')
+            model.AddMinEquality(min_equal_var, players_position_intervals)
+            max_equal_var = model.NewIntVar(0, num_intervals, 'equalVar')
+            model.AddMaxEquality(num_intervals - max_equal_var, players_position_intervals)
+            model.Add((num_intervals - max_equal_var) - min_equal_var < 2)
+            objective_terms.append(min_equal_var)
+            objective_terms.append(max_equal_var)
 
     # Objective
-    objective_terms = []
+
     for k in range(num_intervals):
         for i in range(num_players):
             for j in range(num_positions):
-                objective_terms.append(position_skills[i][j] * x[(i, j, k)])
+                player_value = i_j_to_player_value(i, j)
+                position_weight = position_weights[formation_positions[j]]
+                objective_terms.append(player_value * position_weight * x[(i, j, k)])
+
+    for k in range(num_intervals):
+        for i in range(num_players):
+            for j in range(num_positions):
+                if k > 0 and k != int(num_intervals/2):
+                    objective_terms.append(same_position_bonus[(i, j, k)])
+
     model.Maximize(sum(objective_terms))
 
     # Solve
     solver = cp_model.CpSolver()
+    # solver.parameters.log_search_progress = True
+    solver.parameters.num_search_workers = 6
+    solver.parameters.max_time_in_seconds = 30
     status = solver.Solve(model)
 
     if status != cp_model.OPTIMAL and status != cp_model.FEASIBLE:
@@ -143,6 +225,9 @@ def main(num_intervals, formation_positions, playing_time_level = 'equal'):
     total_game_value = 0
 
     # For every player
+    positions_reserved_by_interval = {}
+    for k in range(num_intervals):
+        positions_reserved_by_interval[k] = []
     for i in range(num_players):
         player_name = players[i]
         # For every Interval
@@ -151,13 +236,17 @@ def main(num_intervals, formation_positions, playing_time_level = 'equal'):
             position_played = 0
             for j in range(num_positions):
                 if solver.BooleanValue(x[(i, j, k)]):
-                    position_played = formation_position_index[j]
+                    if formation_positions[j] in positions_reserved_by_interval[k]:
+                        position_played = f'{formation_positions[j]}_b'
+                    else:
+                        position_played = formation_positions[j]
+                        positions_reserved_by_interval[k].append(formation_positions[j])
             if player_name not in full_game_by_player:
                 full_game_by_player[player_name] = [position_played]
             else:
                 full_game_by_player[player_name].append(position_played)
             if position_played != 0:
-                player_value = position_skills[i][j]
+                player_value = i_j_to_player_value(i, j)
                 total_game_value += player_value
 
     # Every interval
@@ -165,17 +254,23 @@ def main(num_intervals, formation_positions, playing_time_level = 'equal'):
         players_benched = []
         players_playing = []
         # Add on-field position for each player
+        positions_reserved = []
         for i in range(num_players):
             player_name = players[i]
             for j in range(num_positions):
-                position = formation_position_index[j]
+                position = formation_positions[j]
+                position_name = position
                 if solver.BooleanValue(x[(i, j, k)]):
+                    if position in positions_reserved:
+                        position_name = f'{position}b'
                     players_playing.append(player_name)
-                    if position not in full_game_by_position:
-                        full_game_by_position[position] = [player_name]
+                    if position_name not in full_game_by_position:
+                        full_game_by_position[position_name] = [player_name]
                     else:
-                        full_game_by_position[position].append(player_name)
-        # Add bench
+                        full_game_by_position[position_name].append(player_name)
+                    positions_reserved.append(position)
+
+    # Add bench
         for player in players:
             if player not in players_playing:
                 players_benched.append(player)
@@ -194,101 +289,105 @@ def main(num_intervals, formation_positions, playing_time_level = 'equal'):
         data = [*data, len(intervals_played)]
         table_player_data.append([player, *data])
     formation_positions_with_bench = formation_positions + [f'Bench {i}' for i in range(num_players-num_positions)]
+    positions_reserved = []
     for position in formation_positions_with_bench:
-        table_position_data.append([position, *full_game_by_position[position]])
-    return total_game_value, table_player_data, table_position_data
+        position_name = position
+        if position in positions_reserved:
+            position_name = f'{position}b'
+        table_position_data.append([position_name, *full_game_by_position[position_name]])
+        positions_reserved.append(position)
+
+    return total_game_value, table_player_data, table_position_data, formation_positions_with_name
+
 
 
 def iterations():
+    force_starting_bench = [
+        'Bilind',
+        'Owen',
+        'Liam'
+    ]
+    missing_players = []
     formations = [
-        [2, 3, 4, 7, 8, 11, 10, 9, '3-3-2-standard'],
-        [2, 3, 4, 7, 6, 8, 11, 9, '3-4-1'],
-        [4, 5, 6, 8, 10, 7, 9, 11, '2-3-3-center-backs'],
-        [2, 4, 6, 8, 10, 7, 9, 11, '2-3-3-mixed-backs'],
-        [2, 3, 6, 8, 10, 7, 9, 11, '2-3-3-wing-backs'],
-        [2, 4, 7, 6, 8, 11, 10, 9, '2-4-2-mixed-backs'],
-        [2, 3, 7, 6, 8, 11, 10, 9, '2-4-2-wing-backs'],
-        [4, 5, 7, 6, 8, 11, 10, 9, '2-4-2-center-backs'],
-        [2, 3, 4, 5, 7, 8, 11, 9, '4-3-2-striker'],
-        [2, 3, 4, 5, 7, 8, 11, 10, '4-3-2-fwd-mid'],
-        [2, 3, 4, 5, 6, 8, 10, 9, '4-3-2-mid-heavy'],
-        [2, 4, 3, 6, 7, 8, 11, 9, '3-1-3-1-striker'],
-        [2, 4, 3, 6, 7, 8, 11, 10, '3-1-3-1-fwd-mid'],
+        [2, 3, 4, 7, 8, 11, 10, 9, '3-3-2'],
+        # [4, 5, 6, 8, 10, 7, 9, 11, '2-3-3 (4-5)'],
+        # [2, 3, 6, 8, 10, 7, 9, 11, '2-3-3 (2-3)'],
+        # [2, 4, 6, 8, 10, 7, 9, 11, '2-3-3 (2-4)'],
+        # [2, 4, 3, 6, 8, 7, 9, 11, '3-2-3 (6-8)'],
+        # [2, 4, 3, 8, 10, 7, 9, 11, '3-2-3 (8-10)'],
+        # [2, 4, 7, 6, 8, 11, 10, 9, '2-4-2 (2-4)'],
+        [2, 3, 7, 6, 8, 11, 10, 9, '2-4-2 (2-3)'],
+        # [4, 5, 7, 6, 8, 11, 10, 9, '2-4-2 (4-5)'],
+        # [2, 4, 3, 6, 7, 10, 11, 9, '3-1-3-1 (6-10)'],
+        # [2, 4, 3, 8, 7, 10, 11, 9, '3-1-3-1 (8-10)'],
     ]
     # 3 3 2
-    # formations_positions = [2, 3, 4, 7, 8, 11, 10, 9]
+    # formation_positions = [2, 3, 4, 7, 8, 11, 10, 9]
     # 2 3 3
-    # formations_positions = [4, 5, 6, 8, 10, 7, 9, 11]
-    # formations_positions = [2, 4, 6, 8, 10, 7, 9, 11]
-    # formations_positions = [2, 3, 6, 8, 10, 7, 9, 11]
+    # formation_positions = [4, 5, 6, 8, 10, 7, 9, 11]
+    # formation_positions = [2, 4, 6, 8, 10, 7, 9, 11]
+    # formation_positions = [2, 3, 6, 8, 10, 7, 9, 11]
     # 2 4 2
-    # formations_positions = [2, 4, 7, 6, 8, 11, 10, 9]
-    # formations_positions = [2, 3, 7, 6, 8, 11, 10, 9]
-    # formations_positions = [4, 5, 7, 6, 8, 11, 10, 9]
+    # formation_positions = [2, 4, 7, 6, 8, 11, 10, 9]
+    # formation_positions = [2, 3, 7, 6, 8, 11, 10, 9]
+    # formation_positions = [4, 5, 7, 6, 8, 11, 10, 9]
     force_interval = False
-    playing_level_time = 'equal'
-    for num_intervals in range(6, 10000000):
-        if not force_interval:
-            result = main(num_intervals, formations[0][:-1], playing_level_time)
-        else:
-            result = 'pass'
-            num_intervals = force_interval
-        if (isinstance(result, int)):
-            print(f'Solution not found for {num_intervals} intervals: {status_map[result]}')
-        else:
-            print(f'Solution found for {num_intervals} intervals')
-            best_score = 0
-            best_formation = []
-            all_formations = []
-            for f in formations:
-                result = main(num_intervals, f[:-1], playing_level_time)
-                if isinstance(result, int):
-                    print(f'Failure: {status_map[result]}')
-                    exit()
-                score, table_player_data, table_position_data = result
-                all_formations.append([score, f[-1]])
-                if score > best_score:
-                    best_score = score
-                    best_formation = f
-            print(f'Num Intervals: {num_intervals}')
-            print(f'Best formation: {best_formation}')
-            print(f'Score: {best_score}')
-            print('')
-            print('')
-            interval_columns = [i+1 for i in range(num_intervals)] + ['Total']
-            # table_player_data_totals =
-            print(tabulate(table_player_data, headers=['Player', *interval_columns], tablefmt="fancy_grid"))
-            print('')
-            print('')
-            print(tabulate(table_position_data, headers=['Position', *[i+1 for i in range(num_intervals)]], tablefmt="fancy_grid"))
-            print('')
-            print(f'All formation scores:')
-            pp.pprint(sorted(all_formations, key=lambda x: (x[0]), reverse=True))
-            exit()
+    # playing_level_time = 'unequal'
+    playing_level_time = 'feasible_equality'
+    for num_intervals in range(2, 10000000):
+        if (num_intervals%2 == 0):
+            if not force_interval:
+                result = main(num_intervals, formations[0], playing_level_time, force_starting_bench, missing_players)
+            else:
+                result = 'pass'
+                num_intervals = force_interval
+            if (isinstance(result, int)):
+                print(f'Solution not found for {num_intervals} intervals: {status_map[result]}')
+            else:
+                print(f'Solution found for {num_intervals} intervals')
+                best_score = 0
+                best_result = ()
+                all_formations = []
+                for fidx, f in enumerate(formations):
+                    result = main(num_intervals, f, playing_level_time, force_starting_bench, missing_players)
+                    if isinstance(result, int):
+                        print(f'Failure: {status_map[result]}')
+                        exit()
+                    print(f'{fidx}/{len(formations)}: Solution found for {f}')
+                    (score,
+                     table_player_data,
+                     table_position_data,
+                     best_formation
+                     ) = result
+                    all_formations.append([score/num_intervals, f[-1]])
+                    if score > best_score:
+                        best_score = score
+                        best_result = (score,
+                                       table_player_data,
+                                       table_position_data,
+                                       best_formation,
+                                       )
+                (score,
+                 table_player_data,
+                 table_position_data,
+                 best_formation
+                 ) = best_result
+                print(f'Num Intervals: {num_intervals}')
+                print(f'Best formation: {best_formation}')
+                print(f'Score: {best_score/num_intervals}')
+                print('')
+                print('')
+                interval_columns = [i+1 for i in range(num_intervals)] + ['Total']
+                # table_player_data_totals =
+                print(tabulate(table_player_data, headers=['Player', *interval_columns], tablefmt="fancy_grid"))
+                print('')
+                print('')
+                print(tabulate(table_position_data, headers=['Position', *[i+1 for i in range(num_intervals)]], tablefmt="fancy_grid"))
+                print('')
+                print(f'All formation scores:')
+                pp.pprint(sorted(all_formations, key=lambda x: (x[0]), reverse=True))
+                exit()
 
 
 if __name__ == '__main__':
     iterations()
-
-
-
-
-# for j in range(num_positions):
-#     if solver.BooleanValue(x[(i, j, k)]):
-#         player_assignments.append([k, players[i], formation_position_index[j]])
-#         players_playing.append(players[i])
-#         players_by_position[formation_position_index[j]] = players[i]
-#         lineup_value += position_skills[i][j]
-#         if players[i] in player_time:
-#             player_time[players[i]] += 1
-#         else:
-#             player_time[players[i]] = 1
-#         if players[i] in full_game_player_positions:
-#             full_game_player_positions[players[i]].append(formation_position_index[j])
-#         else:
-#             full_game_player_positions[players[i]] = [formation_position_index[j]]
-#     else:
-#         if players[i] in full_game_player_positions:
-#             full_game_player_positions[players[i]].append(0)
-#         else:
-#             full_game_player_positions[players[i]] = [0]
