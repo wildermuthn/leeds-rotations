@@ -2,6 +2,8 @@ from ortools.sat.python import cp_model
 from tabulate import tabulate
 import pprint
 import enum
+from flask import Flask, request
+import json
 
 pp = pprint.PrettyPrinter(indent=4)
 
@@ -60,49 +62,64 @@ def main(
     model = cp_model.CpModel()
     player_number_values = [
 
-        # Best guess on skill-level
-        ['Position',    2,      3,      4,      5,      6,      7,      11,     8,      10,     9,      1],
-        ['Aras',        3,      3.1,    3,      2,      2,      4,      4.1,    3,      5,      5,      0],
-        ['Bilind',      4,      4,      3,      3,      2,      4,      3,      2,      2,      3,      0],
-        ['Brady',       3,      4,      3,      3,      3,      4,      5,      4,      3,      3,      1],
-        ['Emir',        3,      3.1,    3,      3,      3,      3,      3.1,    2,      2,      2,      1],
-        ['Henry',       3,      4.1,    3,      3,      4,      3,      4.1,    5,      5,      4,      3],
-        ['James',       4,      4,      5,      4,      0,      0,      0,      0,      0,      0,      0],
-        ['Leo',         4,      4.1,    3,      3,      4,      4,      4,      3,      4,      3,      2],
-        ['Liam',        2,      2,      1,      1,      1,      2,      2,      1,      1,      2,      0],
-        ['Oliver',      2,      2,      2,      2,      2,      3,      3,      2,      3,      3,      3],
-        ['Owen',        2,      2,      2,      2,      0,      0,      0,      0,      1,      1,      0],
-        ['Sam',         3,      3,      3,      3,      4,      4,      3,      4,      5,      5,      2],
-        ['Weight',      1,      1,      1,      1,      1,      1,      1,      1,      1,      1,      1]
+        # Baseline
+        # ['Position',    1,      2,      3,      4,      5,      6,      7,      11,     8,      10,     9],
+        # ['Aras',        0,      0,      0,      0,      0,      0,      0,      0,      0,      5,      5],
+        # ['Bilind',      0,      0,      0,      0,      0,      0,      0,      0,      0,      0,      0],
+        # ['Brady',       0,      0,      0,      0,      0,      0,      0,      5,      0,      0,      0],
+        # ['Emir',        0,      0,      5,      0,      0,      0,      0,      0,      0,      0,      0],
+        # ['Henry',       0,      0,      0,      0,      0,      0,      0,      0,      5,      0,      0],
+        # ['James',       0,      0,      0,      5,      5,      0,      0,      0,      0,      0,      0],
+        # ['Leo',         0,      5,      0,      0,      0,      5,      0,      0,      0,      0,      0],
+        # ['Liam',        0,      0,      0,      0,      0,      0,      0,      0,      0,      0,      0],
+        # ['Oliver',      5000000,      0,      0,      0,      0,      0,      5,      0,      0,      0,      0],
+        # ['Owen',        0,      0,      0,      0,      0,      0,      0,      0,      0,      0,      0],
+        # ['Sam',         0,      0,      0,      0,      0,      0,      0,      0,      0,      5,      5],
 
         # Best guess on skill-level
-        # ['Position',    2, 3, 4, 5, 6, 7,11, 8,10, 9, 1],
-        # ['Aras',2.833333333,2.833333333,3,3,3,3.5,3.5,3.25,3.75,4, 0],
-        # ['Bilind',3.333333333,3.333333333,3.25,3.25,3.25,3.5,3.5,3.25,3.25,3, 0],
-        # ['Brady',3.5,3.5,3.75,3.75,3.5,3.5,3.5,3.5,3.75,3.75, 0],
-        # ['Emir',2.833333333,2.833333333,3,3,2.75,3,3,3,3.25,3.5, 0],
-        # ['Henry',3.333333333,3.333333333,3.75,3.75,4,3.75,3.75,4,4,3.5, 0],
-        # ['James',3,3,3.25,3.25,3,2.75,2.75,3.25,2.75,2.75, 0],
-        # ['Leo',3.666666667,3.666666667,3.5,3.5,3.75,4,4,3.75,4,3.25, 0],
-        # ['Liam',2.833333333,2.833333333,2.75,2.75,2.75,2.5,2.5,2.5,2.5,2.25, 0],
-        # ['Oliver',3.333333333,3.333333333,3.25,3.25,3.25,3.25,3.25,3.25,3.5,3.5, 100],
-        # ['Owen',2.333333333,2.333333333,2,2,2.25,2,2,2,2.25,2.5, 0],
-        # ['Sam',3.166666667,3.166666667,3.25,3.25,3.25,3.75,3.75,3.5,3.75,3.75, 100],
-        # ['Weight',      1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+        ['Position',    2,      3,      4,      5,      6,      7,      11,     8,      10,     9],
+        ['Aras',        3,      3,      3,      2,      2,      4,      4,      3,      4,      5],
+        ['Bilind',      4,      4,      3,      3,      2,      4,      3,      2,      2,      3],
+        ['Brady',       3,      4,      3,      3,      3,      4,      5,      4,      3,      3],
+        ['Emir',        3,      3,      3,      3,      3,      3,      3,      2,      2,      2],
+        ['Henry',       3,      4,      3,      3,      4,      3,      4,      5,      5,      4],
+        ['James',       4,      4,      5,      4,      0,      0,      0,      0,      0,      0],
+        ['Leo',         4,      4,      3,      3,      4,      4,      4,      3,      4,      3],
+        ['Liam',        2,      2,      1,      1,      1,      2,      2,      1,      1,      2],
+        ['Oliver',      2,      2,      2,      2,      2,      3,      3,      2,      3,      3],
+        ['Owen',        2,      2,      1,      1,      0,      1,      1,      0,      1,      1],
+        ['Sam',         3,      3,      3,      3,      4,      4,      3,      4,      4.5,    5],
+        # ['Weight',      1,      1,      1,      1,      1,      1,      1,      1,      1,      1,      1]
 
+        # Best guess on skill-level
+        # ['Position',    2,      3,      4,      5,      6,      7,      11,     8,      10,     9,      1],
+        # ['Aras',        2.8,    2.8,    3,      3,      3,      3.75,   3.75,   3.25,   3.75,   4,      0],
+        # ['Bilind',      3.3,    3.3,    3.25,   3.25,   3.25,   3.5,    3.5,    3.25,   3.25,   3,      0],
+        # ['Brady',       3.5,    3.5,    3.5,    3.5,    3.5,    3.5,    3.5,    3.5,    3.5,    3.75,   0],
+        # ['Emir',        2.8,    2.8,    3,      3,      3,      3,      3,      3,      3.25,   3.5,    0],
+        # ['Henry',       3.3,    3.3,    3.25,   3.25,   4,      3.75,   3.75,   4.25,   4,      3.5,    0],
+        # ['James',       3,      3,      3.75,   3.75,   3,      2.75,   2.75,   3.25,   2.75,   2.25,   0],
+        # ['Leo',         4,      4,      3.5,    3.5,    3.75,   4,      4,      3.75,   4,      3.25,   0],
+        # ['Liam',        2.75,   2.75,   2.75,   2.75,   2.75,   2.5,    2.5,    2.5,    2.5,    2.25,   0],
+        # ['Oliver',      3.3,    3.3,    3,      3,      3,      3.25,   3.25,   3,      3.25,   3.25,   3],
+        # ['Owen',        2.3,    2.3,    2,      2,      2.25,   2,      2,      2,      2.25,   2.25,   0],
+        # ['Sam',         3.2,    3.2,    3.25,   3.25,   3.25,   3.75,   3.75,   3.5,    3.75,   3.75,   0],
     ]
+
     players = [row[0] for idx, row in enumerate(player_number_values)
                if idx != 0
                and
-               idx != len(player_number_values)-1
-               and
                row[0] not in missing_players]
     values_idx_by_player = [row[0] for row in player_number_values]
-    num_players = len(player_number_values) - len(missing_players) - 2
+    num_players = len(players)
     num_positions = int(len(formation_positions)/2)
     formation_labels = [i for i in formation_positions if isinstance(i, str)]
     formation_numbers = [i for i in formation_positions if not isinstance(i, str)]
     number_to_player_value_idx = player_number_values[0][1:]
+
+    def j_to_player_numbers(j):
+        numbers = formation_numbers[j]
+        return numbers
 
     def j_to_values_indexes(j):
         numbers = formation_numbers[j]
@@ -166,7 +183,7 @@ def main(
         sum_intervals = {}
         for i in range(num_players):
             n_intervals = model.NewIntVar(0,num_intervals, f'sum_intervals[{i}]')
-            model.Add(n_intervals == sum(x[(i, j, k)] for k in range(num_intervals) for j in range(num_positions)))
+            model.Add(n_intervals == sum(x[(i, j, k)] for k in range(num_intervals) for j in range(num_positions) if j != 0))
             sum_intervals[i] = n_intervals
 
         for i in range(num_players):
@@ -188,8 +205,6 @@ def main(
     # Set variables for playing time
     if playing_time_level != Playtime.UNEQUAL:
 
-
-
         # Get num intervals a player is allocated
         players_position_intervals = []
         for i in range(num_players):
@@ -205,21 +220,26 @@ def main(
             model.AddMinEquality(int(num_intervals * .75), players_position_intervals)
 
         if playing_time_level == Playtime.FEASIBLE:
-            min_equal_var = model.NewIntVar(0, num_intervals, 'equalVar')
+            lt_equal_var = model.NewIntVar(0, 10, 'ltEqualVar')
+            min_equal_var = model.NewIntVar(0, num_intervals, 'minEqualVar')
             model.AddMinEquality(min_equal_var, players_position_intervals)
-            max_equal_var = model.NewIntVar(0, num_intervals, 'equalVar')
+            max_equal_var = model.NewIntVar(0, num_intervals, 'maxEqualVar')
             model.AddMaxEquality(num_intervals - max_equal_var, players_position_intervals)
-            model.Add((num_intervals - max_equal_var) - min_equal_var < 2)
-            objective_terms.append(min_equal_var)
-            objective_terms.append(max_equal_var)
+            model.Add((num_intervals - max_equal_var) - min_equal_var < lt_equal_var)
+            objective_terms.append(min_equal_var * 10)
+            objective_terms.append(max_equal_var * 10)
+            objective_terms.append(lt_equal_var * -10)
 
     # Objective
+
+    # Team Strength
     for k in range(num_intervals):
         for i in range(num_players):
             for j in range(num_positions):
                 player_value = i_j_to_player_value(i, j)
                 objective_terms.append(player_value * x[(i, j, k)])
 
+    # Avoid on-field position changes
     if no_on_field_changes:
         for k in range(num_intervals):
             for i in range(num_players):
@@ -227,6 +247,22 @@ def main(
                     if k > 0 and k != int(num_intervals/2):
                         objective_terms.append(same_position_bonus[(i, j, k)])
 
+    # # Ensure min number of positions played, unless goalkeeper
+    # positions_played = {}
+    # min_player_positions = [model.NewIntVar(0, 1, f'min_player_positions_{n}') for n in range(num_players)]
+    # if vary_positions:
+    #     for i in range(num_players):
+    #         for j in range(num_positions):
+    #             positions_played[(i, j)] = model.NewIntVar(0, 1, 'positions_played')
+    #             model.AddMaxEquality(positions_played[(i, j)], [x[(i, j, k)] for k in range(num_intervals)])
+    #     for i in range(num_players):
+    #         model.Add(
+    #             sum([positions_played[(i, j)] for j in range(num_positions)])
+    #             > min_player_positions[i])
+    #     # One goalkeeper per game
+    #     model.Add(sum(positions_played[(i, 0)] for i in range(num_players)) == 1)
+    #
+    # objective_terms.append(sum(min_player_positions) * 2)
     model.Maximize(sum(objective_terms))
 
     # Solve
@@ -236,8 +272,15 @@ def main(
     solver.parameters.max_time_in_seconds = 5
     status = solver.Solve(model)
 
+
     if status != cp_model.OPTIMAL and status != cp_model.FEASIBLE:
         return status
+
+
+    # pp = {}
+    # for i in range(num_players):
+    #     for j in range(num_positions):
+    #         pp[(i, j)] = solver.Value(positions_played[(i, j)])
 
     # Get and transform solution
     full_game_by_player = {}
@@ -304,23 +347,27 @@ def main(
     for position_name in formation_positions_with_bench:
         table_position_data.append([position_name, *full_game_by_position[position_name]])
 
+    # print(f'ltequal: {solver.Value(lt_equal_var)}')
+    # for m in min_player_positions:
+    #     print(f'min_player_positions: {solver.Value(m)}')
+
     return total_game_value, table_player_data, table_position_data, formation_positions_data
 
 
 
 def iterations():
-    force_starting_bench = []
-    missing_players = ['Brady']
-    vary_position = False
+    force_starting_bench = ['Owen', 'Liam']
+    missing_players = ['Oliver']
+    vary_position = True
     force_interval = False
-    min_intervals = 4
-    no_on_field_changes = False
-    no_long_bench = False
+    min_intervals = 6
+    no_on_field_changes = True
+    no_long_bench = True
     playing_level_time = Playtime.FEASIBLE
+    force_formation = '3-3-2'
     formations = [
         [
             '3-3-2',
-            'GK', [1],
             'LD', [3],
             'CD', [4, 5],
             'RD', [2],
@@ -332,7 +379,6 @@ def iterations():
         ],
         [
             '2-4-2',
-            'GK', [1],
             'LD', [3, 4, 5],
             'RD', [2, 4, 5],
             'LM', [11],
@@ -344,7 +390,6 @@ def iterations():
         ],
         [
             '2-3-3',
-            'GK', [1],
             'LD', [3, 4, 5],
             'RD', [2, 4, 5],
             'LM', [11],
@@ -356,7 +401,6 @@ def iterations():
         ],
         [
             '3-2-3',
-            'GK', [1],
             'LD', [3],
             'CD', [4, 5, 6],
             'RD', [2],
@@ -368,7 +412,6 @@ def iterations():
         ],
         [
             '3-1-3-1',
-            'GK', [1],
             'LD', [3],
             'CD', [4, 5, 6],
             'RD', [2],
@@ -379,6 +422,12 @@ def iterations():
             'S', [9]
         ],
     ]
+    if force_formation:
+        force_formation_item = False
+        for f in formations:
+            if f[0] == force_formation:
+                force_formation_item = f
+        formations = [force_formation_item]
 
     for num_intervals in range(min_intervals, 10000000):
         if (num_intervals%2 == 0):
@@ -415,7 +464,7 @@ def iterations():
                     if isinstance(result, int):
                         print(f'Failure: {status_map[result]}')
                         exit()
-                    print(f'{fidx}/{len(formations)}: Solution found for {f}')
+                    print(f'{fidx}/{len(formations)}: Solution found for {f[0]}')
                     (score,
                      table_player_data,
                      table_position_data,
@@ -434,22 +483,35 @@ def iterations():
                  table_position_data,
                  best_formation_data
                  ) = best_result
-                print(f'Num Intervals: {num_intervals}')
-                print(f'Best formation: {best_formation_data}')
-                print(f'Score: {best_score/num_intervals}')
-                print('')
+
                 print('')
                 interval_columns = [i+1 for i in range(num_intervals)] + ['Total']
-                # table_player_data_totals =
                 print(tabulate(table_player_data, headers=['Player', *interval_columns], tablefmt="fancy_grid"))
-                print('')
                 print('')
                 print(tabulate(table_position_data, headers=['Position', *[i+1 for i in range(num_intervals)]], tablefmt="fancy_grid"))
                 print('')
-                print(f'All formation scores:')
-                pp.pprint(sorted(all_formations, key=lambda x: (x[0]), reverse=True))
+                print(f'Num Intervals: {num_intervals}')
+                print(f'Best Formation: {best_formation_data[0]}')
+                print(f'{best_formation_data[0]} Score: {score/num_intervals}')
+                if len(all_formations) > 1:
+                    print('')
+                    print(f'All formation scores:')
+                    sorted_formation = sorted(all_formations, key=lambda x: (x[0]), reverse=True)
+                    for f in sorted_formation:
+                        print(f'{f[1]}: {f[0]}')
                 exit()
 
 
-if __name__ == '__main__':
+# app = Flask(__name__)
+#
+# @app.route('/query', methods = ['POST'])
+# def sum_of_array():
+#     data = request.get_json()
+#     print(data['foo'])
+#
+#     return json.dumps(data)
+
+
+if __name__ == "__main__":
+    # app.run(port=5000)
     iterations()
