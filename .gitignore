@@ -1,3 +1,16 @@
 /.idea/
 /venv/
 /leeds-rotations.iml
+__pycache__/
+.cache/
+/.idea/
+/.idea/
+/experiments/
+/.npm/
+/.local/
+/.config/
+/.bash_history
+/.python_history
+/api/server/wandb/
+/api/server/node_modules/
+/api/client/node_modules/
