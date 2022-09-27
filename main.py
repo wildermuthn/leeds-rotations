@@ -9,9 +9,7 @@ pp = pprint.PrettyPrinter(indent=4)
 
 class Playtime(enum.Enum):
     UNEQUAL = 0
-    ALMOST_EQUAL = 1
-    EQUAL = 2
-    FEASIBLE = 3
+    FEASIBLE = 1
 
 status_map = {
     0: 'unknown',
@@ -27,25 +25,6 @@ left_footers = [
     'Henry',
     'Brady'
 ]
-
-ordered_roster_names = [
-    'Aras',
-    'Bilind',
-    'Brady',
-    'Emir',
-    'Henry',
-    'James',
-    'Leo',
-    'Liam',
-    'Oliver',
-    'Owen',
-    'Sam',
-]
-
-position_values_index = [
-    2, 3, 4, 5, 6, 7, 11, 8, 10, 9
-]
-
 
 def main(
         num_intervals,
@@ -77,18 +56,18 @@ def main(
         # ['Sam',         0,      0,      0,      0,      0,      0,      0,      0,      0,      5,      5],
 
         # Best guess on skill-level
-        ['Position',    2,      3,      4,      5,      6,      7,      11,     8,      10,     9],
-        ['Aras',        3,      3,      3,      2,      2,      4,      4,      3,      4,      5],
-        ['Bilind',      4,      4,      3,      3,      2,      4,      3,      2,      2,      3],
-        ['Brady',       3,      4,      3,      3,      3,      4,      5,      4,      3,      3],
-        ['Emir',        3,      3,      3,      3,      3,      3,      3,      2,      2,      2],
-        ['Henry',       3,      4,      3,      3,      4,      3,      4,      5,      5,      4],
-        ['James',       4,      4,      5,      4,      0,      0,      0,      0,      0,      0],
-        ['Leo',         4,      4,      3,      3,      4,      4,      4,      3,      4,      3],
-        ['Liam',        2,      2,      1,      1,      1,      2,      2,      1,      1,      2],
-        ['Oliver',      2,      2,      2,      2,      2,      3,      3,      2,      3,      3],
-        ['Owen',        2,      2,      1,      1,      0,      1,      1,      0,      1,      1],
-        ['Sam',         3,      3,      3,      3,      4,      4,      3,      4,      4.5,    5],
+        ['Position',    1,       2,      3,      4,      5,      6,      7,      11,     8,      10,     9],
+        ['Aras',        0,       3,      3,      3,      2,      2,      4,      4,      3,      4,      5],
+        ['Bilind',      0,       4,      4,      3,      3,      2,      4,      3,      2,      2,      3],
+        ['Brady',       0,       3,      4,      3,      3,      3,      4,      5,      4,      3,      3],
+        ['Emir',        0,       4,      4,      3,      3,      3,      3,      3,      2,      2,      2],
+        ['Henry',       0,       3,      4,      3,      3,      4,      3,      4,      5,      5,      4],
+        ['James',       0,       3,      3,      5,      5,      0,      0,      0,      0,      0,      0],
+        ['Leo',         0,       5,      5,      3,      3,      4,      4,      4,      3,      4,      2],
+        ['Liam',        0,       2,      2,      1,      1,      1,      2,      2,      1,      1,      2],
+        ['Oliver',      1,       2,      2,      2,      2,      2,      3,      3,      2,      3,      3],
+        ['Owen',        0,       2,      2,      0,      0,      0,      1,      1,      0,      1,      0],
+        ['Sam',         0,       3,      3,      3,      3,      4,      4,      3,      4,      4.5,    5],
         # ['Weight',      1,      1,      1,      1,      1,      1,      1,      1,      1,      1,      1]
 
         # Best guess on skill-level
@@ -179,17 +158,17 @@ def main(
                         )
 
     # Prevent a player from always playing the same position
-    if vary_positions:
-        sum_intervals = {}
-        for i in range(num_players):
-            n_intervals = model.NewIntVar(0,num_intervals, f'sum_intervals[{i}]')
-            model.Add(n_intervals == sum(x[(i, j, k)] for k in range(num_intervals) for j in range(num_positions) if j != 0))
-            sum_intervals[i] = n_intervals
-
-        for i in range(num_players):
-            for j in range(num_positions):
-                # Prevent player from playing the same position the entire game.
-                model.Add(sum_intervals[i] > sum(x[(i, j, k)] for k in range(num_intervals)))
+    # if vary_positions:
+    #     sum_intervals = {}
+    #     for i in range(num_players):
+    #         n_intervals = model.NewIntVar(0,num_intervals, f'sum_intervals[{i}]')
+    #         model.Add(n_intervals == sum(x[(i, j, k)] for k in range(num_intervals) for j in range(num_positions) if j != 0))
+    #         sum_intervals[i] = n_intervals
+    #
+    #     for i in range(num_players):
+    #         for j in range(num_positions):
+    #             # Prevent player from playing the same position the entire game.
+    #             model.Add(sum_intervals[i] > sum(x[(i, j, k)] for k in range(num_intervals)))
 
     objective_terms = []
 
@@ -211,24 +190,16 @@ def main(
             s = cp_model.LinearExpr.Sum([x[(i, j, k)] for j in range(num_positions) for k in range(num_intervals)])
             players_position_intervals.append(s)
 
-        if playing_time_level == Playtime.EQUAL:
-            equal_var = model.NewIntVar(0, num_intervals, 'equalVar')
-            model.AddMaxEquality(equal_var, players_position_intervals)
-            model.AddMinEquality(equal_var, players_position_intervals)
-
-        if playing_time_level == Playtime.ALMOST_EQUAL:
-            model.AddMinEquality(int(num_intervals * .75), players_position_intervals)
-
         if playing_time_level == Playtime.FEASIBLE:
             lt_equal_var = model.NewIntVar(0, 10, 'ltEqualVar')
             min_equal_var = model.NewIntVar(0, num_intervals, 'minEqualVar')
             model.AddMinEquality(min_equal_var, players_position_intervals)
             max_equal_var = model.NewIntVar(0, num_intervals, 'maxEqualVar')
             model.AddMaxEquality(num_intervals - max_equal_var, players_position_intervals)
-            model.Add((num_intervals - max_equal_var) - min_equal_var < lt_equal_var)
-            objective_terms.append(min_equal_var * 10)
-            objective_terms.append(max_equal_var * 10)
-            objective_terms.append(lt_equal_var * -10)
+            model.Add((num_intervals - max_equal_var) - min_equal_var < 2)
+            objective_terms.append(min_equal_var)
+            objective_terms.append(max_equal_var)
+            objective_terms.append(lt_equal_var)
 
     # Objective
 
@@ -245,24 +216,25 @@ def main(
             for i in range(num_players):
                 for j in range(num_positions):
                     if k > 0 and k != int(num_intervals/2):
-                        objective_terms.append(same_position_bonus[(i, j, k)])
+                        objective_terms.append(same_position_bonus[(i, j, k)] * 2)
 
-    # # Ensure min number of positions played, unless goalkeeper
-    # positions_played = {}
-    # min_player_positions = [model.NewIntVar(0, 1, f'min_player_positions_{n}') for n in range(num_players)]
-    # if vary_positions:
-    #     for i in range(num_players):
-    #         for j in range(num_positions):
-    #             positions_played[(i, j)] = model.NewIntVar(0, 1, 'positions_played')
-    #             model.AddMaxEquality(positions_played[(i, j)], [x[(i, j, k)] for k in range(num_intervals)])
-    #     for i in range(num_players):
-    #         model.Add(
-    #             sum([positions_played[(i, j)] for j in range(num_positions)])
-    #             > min_player_positions[i])
-    #     # One goalkeeper per game
-    #     model.Add(sum(positions_played[(i, 0)] for i in range(num_players)) == 1)
-    #
-    # objective_terms.append(sum(min_player_positions) * 2)
+
+    # Ensure min number of positions played, unless goalkeeper
+    if vary_positions:
+        positions_played = {}
+        min_player_positions = [model.NewIntVar(0, 1, f'min_player_positions_{n}') for n in range(num_players)]
+        for i in range(num_players):
+            for j in range(num_positions):
+                positions_played[(i, j)] = model.NewIntVar(0, 1, 'positions_played')
+                model.AddMaxEquality(positions_played[(i, j)], [x[(i, j, k)] for k in range(num_intervals)])
+        for i in range(num_players):
+            model.Add(
+                sum([positions_played[(i, j)] for j in range(num_positions)])
+                > min_player_positions[i])
+        # One goalkeeper per game
+        model.Add(sum(positions_played[(i, 0)] for i in range(num_players)) == 1)
+        objective_terms.append(sum(min_player_positions) * 2)
+
     model.Maximize(sum(objective_terms))
 
     # Solve
@@ -272,15 +244,14 @@ def main(
     solver.parameters.max_time_in_seconds = 5
     status = solver.Solve(model)
 
-
     if status != cp_model.OPTIMAL and status != cp_model.FEASIBLE:
         return status
 
-
-    # pp = {}
-    # for i in range(num_players):
-    #     for j in range(num_positions):
-    #         pp[(i, j)] = solver.Value(positions_played[(i, j)])
+    if vary_positions:
+        positions_played_values = {}
+        for i in range(num_players):
+            for j in range(num_positions):
+                positions_played_values[(i, j)] = solver.Value(positions_played[(i, j)])
 
     # Get and transform solution
     full_game_by_player = {}
@@ -347,38 +318,43 @@ def main(
     for position_name in formation_positions_with_bench:
         table_position_data.append([position_name, *full_game_by_position[position_name]])
 
-    # print(f'ltequal: {solver.Value(lt_equal_var)}')
-    # for m in min_player_positions:
-    #     print(f'min_player_positions: {solver.Value(m)}')
+    if playing_time_level != Playtime.UNEQUAL:
+        print(f'ltequal: {solver.Value(lt_equal_var)}')
+
+    if vary_positions:
+        for m in min_player_positions:
+            print(f'min_player_positions: {solver.Value(m)}')
 
     return total_game_value, table_player_data, table_position_data, formation_positions_data
 
 
 
 def iterations():
-    force_starting_bench = ['Owen', 'Liam']
-    missing_players = ['Oliver']
-    vary_position = True
+    force_starting_bench = []
+    missing_players = []
+    vary_position = False
     force_interval = False
     min_intervals = 6
     no_on_field_changes = True
     no_long_bench = True
     playing_level_time = Playtime.FEASIBLE
-    force_formation = '3-3-2'
+    force_formation = '3-2-3'
     formations = [
         [
             '3-3-2',
+            'GK', [1],
             'LD', [3],
             'CD', [4, 5],
             'RD', [2],
             'LM', [11],
-            'CM', [6, 8, 10],
+            'CM', [8],
             'RM', [7],
             'S1', [9],
             'S2', [9],
         ],
         [
             '2-4-2',
+            'GK', [1],
             'LD', [3, 4, 5],
             'RD', [2, 4, 5],
             'LM', [11],
@@ -390,6 +366,7 @@ def iterations():
         ],
         [
             '2-3-3',
+            'GK', [1],
             'LD', [3, 4, 5],
             'RD', [2, 4, 5],
             'LM', [11],
@@ -401,6 +378,7 @@ def iterations():
         ],
         [
             '3-2-3',
+            'GK', [1],
             'LD', [3],
             'CD', [4, 5, 6],
             'RD', [2],
@@ -412,6 +390,7 @@ def iterations():
         ],
         [
             '3-1-3-1',
+            'GK', [1],
             'LD', [3],
             'CD', [4, 5, 6],
             'RD', [2],
